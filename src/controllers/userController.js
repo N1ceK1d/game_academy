@@ -1,16 +1,51 @@
 const pool = require('../config/db');
 
+
 exports.get_results = async (req, res) => {
     try {
-        const result = await pool.query(`
-        SELECT u.login, g.game_name, gr.best_score, gr.total_score
-        FROM GameResult gr
-        JOIN Users u ON gr.user_id = u.id
-        JOIN Games g ON gr.game_id = g.id
-        ORDER BY gr.best_score DESC
-        LIMIT 10
+        const players = await pool.query('SELECT id, login FROM Users');
+        
+        const games = await pool.query('SELECT id, game_name FROM Games');
+        
+        const results = await pool.query(`
+            SELECT user_id, game_id, best_score, total_score 
+            FROM GameResult
         `);
-        res.json(result.rows);
+
+        const responseData = {
+            games: games.rows.map(game => ({
+                id: game.id,
+                name: game.game_name,
+                columns: ['Результат', 'Лучший']
+            })),
+            players: players.rows.map(player => {
+                const playerData = {
+                    name: player.login,
+                    games: {},
+                    total: 0
+                };
+
+                
+                games.rows.forEach(game => {
+                    const result = results.rows.find(r => 
+                        r.user_id === player.id && r.game_id === game.id
+                    );
+
+                    playerData.games[game.id] = {
+                        score: result ? result.total_score : null,
+                        best: result ? result.best_score : null
+                    };
+
+                    if (result) {
+                        playerData.total += result.total_score || 0;
+                    }
+                });
+
+                return playerData;
+            })
+        };
+
+        res.json(responseData);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Ошибка сервера' });
@@ -18,6 +53,8 @@ exports.get_results = async (req, res) => {
 };
 
 exports.set_result = async (req, res) => {
+    console.log(req);
+    
     const { user_login, game_id, game_score } = req.body;
 
     pool.connect((err, result) => {
