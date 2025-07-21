@@ -54,39 +54,41 @@ exports.get_results = async (req, res) => {
 };
 
 exports.set_result = async (req, res) => {
-    try {
-        const { user_login, game_id, game_score } = req.body;
-        
-        // Валидация входных данных
-        if (!user_login || !game_id || isNaN(game_score)) {
-            return res.status(400).json({ error: "Неверные параметры запроса" });
+    console.log(req);
+    
+    const { user_login, game_id, game_score } = req.body;
+
+    pool.connect((err, result) => {
+        if (err) {
+            console.error("Connection faild");
+        } else {
+            console.log("Connection create");
         }
+    });
 
-        const numericGameId = parseInt(game_id);
-        const numericGameScore = parseInt(game_score);
-
+    try {
         const userRes = await pool.query(
-            `INSERT INTO Users (login) VALUES ($1) 
-             ON CONFLICT (login) DO UPDATE SET login = EXCLUDED.login
-             RETURNING id`, 
-            [user_login.toString()]  // Явное преобразование в строку
+        `INSERT INTO Users (login) VALUES ($1) 
+         ON CONFLICT (login) DO UPDATE SET login = EXCLUDED.login
+         RETURNING id`, 
+        [user_login]
         );
-        
         const userId = userRes.rows[0].id;
 
         await pool.query(
-            `INSERT INTO GameResult (user_id, game_id, best_score, total_score)
-             VALUES ($1, $2, $3, $3)
-             ON CONFLICT (user_id, game_id) DO UPDATE SET
-               best_score = GREATEST(GameResult.best_score, EXCLUDED.best_score),
-               total_score = GameResult.total_score + EXCLUDED.total_score`,
-            [userId, numericGameId, numericGameScore]
-        );
+        `INSERT INTO GameResult (user_id, game_id, best_score, total_score)
+         VALUES ($1, $2, $3, $3)
+         ON CONFLICT (user_id, game_id) DO UPDATE SET
+           best_score = GREATEST(GameResult.best_score, EXCLUDED.best_score),
+           total_score = GameResult.total_score + EXCLUDED.total_score`,
+        [userId, game_id, game_score]
+      );
 
-        res.status(200).json({ success: true });
-        
+        console.log('Операция выполнена успешно');
+
     } catch (err) {
         console.error('Ошибка выполнения:', err);
-        res.status(500).json({ error: "Ошибка сервера" });
+        throw err;
     }
+    res.send(200);
 };
