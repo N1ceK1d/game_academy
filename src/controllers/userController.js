@@ -68,7 +68,7 @@ exports.set_result = async (req, res) => {
 
     try {
         const userRes = await pool.query(
-        `INSERT INTO Users (login) VALUES ('$1') 
+        `INSERT INTO Users (login) VALUES ($1) 
          ON CONFLICT (login) DO UPDATE SET login = EXCLUDED.login
          RETURNING id`, 
         [user_login]
