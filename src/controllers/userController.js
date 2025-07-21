@@ -2,7 +2,7 @@ const pool = require('../config/db');
 
 
 exports.get_results = async (req, res) => {
-
+    console.log(req.body);
     try {
         const players = await pool.query('SELECT id, login FROM Users');
         
