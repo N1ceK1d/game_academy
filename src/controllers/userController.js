@@ -54,7 +54,7 @@ exports.get_results = async (req, res) => {
 };
 
 exports.set_result = async (req, res) => {
-    console.log(req);
+    console.log(req.body);
     
     const { user_login, game_id, game_score } = req.body;
 
