@@ -10,7 +10,8 @@ const allowedOrigins = [
   'http://retr0raven.temp.swtest.ru',
   'https://retr0raven.temp.swtest.ru', // Если будет HTTPS
   'http://localhost:3000',              // Для локальной разработки
-  'http://localhost:5500'
+  'http://localhost:5500',
+  'http://myikoalexg.temp.swtest.ru'
 ];
 
 app.use(cors({
