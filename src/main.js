@@ -5,11 +5,12 @@ const cors = require('cors');
 
 const allowedOrigins = [
   'http://myikoalexg.temp.swtest.ru/Train/',
-'http://myikoalexg.temp.swtest.ru/Train2/',
-'http://myikoalexg.temp.swtest.ru/',
+  'http://myikoalexg.temp.swtest.ru/Train2/',
+  'http://myikoalexg.temp.swtest.ru/',
   'http://retr0raven.temp.swtest.ru',
   'https://retr0raven.temp.swtest.ru', // Если будет HTTPS
-  'http://localhost:3000'              // Для локальной разработки
+  'http://localhost:3000',              // Для локальной разработки
+  'http://localhost:5500'
 ];
 
 app.use(cors({
