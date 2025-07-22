@@ -1,55 +1,76 @@
 const pool = require('../config/db');
-
+const JSONStream = require('JSONStream');
 
 exports.get_results = async (req, res) => {
     console.log(req.body);
     try {
+        // Получаем данные из базы
         const players = await pool.query('SELECT id, login FROM Users');
-        
         const games = await pool.query('SELECT id, game_name FROM Games');
-        
         const results = await pool.query(`
             SELECT user_id, game_id, best_score, total_score 
             FROM GameResult
         `);
 
-        const responseData = {
-            games: games.rows.map(game => ({
-                id: game.id,
-                name: game.game_name,
-                columns: ['Результат', 'Лучший']
-            })),
-            players: players.rows.map(player => {
-                const playerData = {
-                    name: player.login,
-                    games: {},
-                    total: 0
+        // Подготавливаем структуру данных для потоковой передачи
+        const gamesData = games.rows.map(game => ({
+            id: game.id,
+            name: game.game_name,
+            columns: ['Результат', 'Лучший']
+        }));
+
+        // Настраиваем потоковый ответ
+        res.setHeader('Content-Type', 'application/json');
+        
+        // Создаем трансформирующий поток для форматирования JSON
+        const jsonStream = JSONStream.stringify();
+        
+        // Подключаем поток к ответу
+        jsonStream.pipe(res);
+
+        // Отправляем начало объекта
+        jsonStream.write({
+            games: gamesData,
+            players: {
+                _isStreamingArray: true, // Флаг для клиента, что массив передается потоково
+            }
+        });
+
+        // Отправляем игроков по одному
+        for (const player of players.rows) {
+            const playerData = {
+                name: player.login,
+                games: {},
+                total: 0
+            };
+
+            games.rows.forEach(game => {
+                const result = results.rows.find(r => 
+                    r.user_id === player.id && r.game_id === game.id
+                );
+
+                playerData.games[game.id] = {
+                    score: result ? result.total_score : null,
+                    best: result ? result.best_score : null
                 };
 
-                
-                games.rows.forEach(game => {
-                    const result = results.rows.find(r => 
-                        r.user_id === player.id && r.game_id === game.id
-                    );
+                if (result) {
+                    playerData.total += result.total_score || 0;
+                }
+            });
 
-                    playerData.games[game.id] = {
-                        score: result ? result.total_score : null,
-                        best: result ? result.best_score : null
-                    };
+            // Отправляем каждого игрока как часть массива players
+            jsonStream.write(playerData);
+        }
 
-                    if (result) {
-                        playerData.total += result.total_score || 0;
-                    }
-                });
-
-                return playerData;
-            })
-        };
-        console.log(responseData);
-        res.json(responseData);
+        // Завершаем поток
+        jsonStream.end();
+        
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Ошибка сервера' });
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Ошибка сервера' });
+        }
     }
 };
 
