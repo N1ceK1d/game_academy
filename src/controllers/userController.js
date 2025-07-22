@@ -4,7 +4,6 @@ const JSONStream = require('JSONStream');
 exports.get_results = async (req, res) => {
     console.log(req.body);
     try {
-        // Получаем данные из базы
         const players = await pool.query('SELECT id, login FROM Users');
         const games = await pool.query('SELECT id, game_name FROM Games');
         const results = await pool.query(`
@@ -12,31 +11,26 @@ exports.get_results = async (req, res) => {
             FROM GameResult
         `);
 
-        // Подготавливаем структуру данных для потоковой передачи
         const gamesData = games.rows.map(game => ({
             id: game.id,
             name: game.game_name,
             columns: ['Результат', 'Лучший']
         }));
 
-        // Настраиваем потоковый ответ
         res.setHeader('Content-Type', 'application/json');
         
-        // Создаем трансформирующий поток для форматирования JSON
         const jsonStream = JSONStream.stringify();
-        
-        // Подключаем поток к ответу
         jsonStream.pipe(res);
 
-        // Отправляем начало объекта
         jsonStream.write({
             games: gamesData,
-            players: {
-                _isStreamingArray: true, // Флаг для клиента, что массив передается потоково
-            }
+            players: [] 
         });
 
-        // Отправляем игроков по одному
+        const stringifier = jsonStream._stringifier;
+        const originalStack = stringifier._stack;
+        stringifier._stack = ['array'];
+
         for (const player of players.rows) {
             const playerData = {
                 name: player.login,
@@ -59,11 +53,11 @@ exports.get_results = async (req, res) => {
                 }
             });
 
-            // Отправляем каждого игрока как часть массива players
             jsonStream.write(playerData);
         }
 
-        // Завершаем поток
+        stringifier._stack = originalStack;
+
         jsonStream.end();
         
     } catch (err) {
