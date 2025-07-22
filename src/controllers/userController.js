@@ -1,70 +1,54 @@
 const pool = require('../config/db');
-const JSONStream = require('JSONStream');
 
 exports.get_results = async (req, res) => {
     console.log(req.body);
     try {
         const players = await pool.query('SELECT id, login FROM Users');
+        
         const games = await pool.query('SELECT id, game_name FROM Games');
+        
         const results = await pool.query(`
             SELECT user_id, game_id, best_score, total_score 
             FROM GameResult
         `);
 
-        const gamesData = games.rows.map(game => ({
-            id: game.id,
-            name: game.game_name,
-            columns: ['Результат', 'Лучший']
-        }));
-
-        res.setHeader('Content-Type', 'application/json');
-        
-        const jsonStream = JSONStream.stringify();
-        jsonStream.pipe(res);
-
-        jsonStream.write({
-            games: gamesData,
-            players: [] 
-        });
-
-        const stringifier = jsonStream._stringifier;
-        const originalStack = stringifier._stack;
-        stringifier._stack = ['array'];
-
-        for (const player of players.rows) {
-            const playerData = {
-                name: player.login,
-                games: {},
-                total: 0
-            };
-
-            games.rows.forEach(game => {
-                const result = results.rows.find(r => 
-                    r.user_id === player.id && r.game_id === game.id
-                );
-
-                playerData.games[game.id] = {
-                    score: result ? result.total_score : null,
-                    best: result ? result.best_score : null
+        const responseData = {
+            games: games.rows.map(game => ({
+                id: game.id,
+                name: game.game_name,
+                columns: ['Результат', 'Лучший']
+            })),
+            players: players.rows.map(player => {
+                const playerData = {
+                    name: player.login,
+                    games: {},
+                    total: 0
                 };
 
-                if (result) {
-                    playerData.total += result.total_score || 0;
-                }
-            });
+                
+                games.rows.forEach(game => {
+                    const result = results.rows.find(r => 
+                        r.user_id === player.id && r.game_id === game.id
+                    );
 
-            jsonStream.write(playerData);
-        }
+                    playerData.games[game.id] = {
+                        score: result ? result.total_score : null,
+                        best: result ? result.best_score : null
+                    };
 
-        stringifier._stack = originalStack;
+                    if (result) {
+                        playerData.total += result.total_score || 0;
+                    }
+                });
 
-        jsonStream.end();
-        
+                return playerData;
+            })
+        };
+        console.log(responseData);
+        res.json(responseData);
     } catch (err) {
         console.error(err);
-        if (!res.headersSent) {
-            res.status(500).json({ error: 'Ошибка сервера' });
-        }
+        res.status(500).json({ error: 'Ошибка сервера' });
     }
 };
 
